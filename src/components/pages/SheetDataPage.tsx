@@ -330,13 +330,22 @@ function TagsView({ leads }: { leads: Lead[] }) {
 
 function AutoAssignView({ leads }: { leads: Lead[] }) {
   const byRep = groupBy(leads, (lead) => lead.attendedBy)
+  const maxAssigned = byRep[0]?.value ?? 0
+
+  function workloadStatus(assignedLeads: number): string {
+    if (maxAssigned === 0) return 'No workload'
+    if (assignedLeads >= maxAssigned * 0.75) return 'High workload'
+    if (assignedLeads >= maxAssigned * 0.35) return 'Medium workload'
+    return 'Low workload - can assign more leads'
+  }
+
   return (
     <DataTable
-      columns={['Representative', 'Assigned Leads', 'Suggested Action']}
-      rows={byRep.map((rep, index) => [
+      columns={['Representative', 'Assigned Leads', 'Workload Status']}
+      rows={byRep.map((rep) => [
         rep.name,
         rep.value,
-        index === byRep.length - 1 ? 'Can receive more new leads' : 'Keep monitoring workload',
+        workloadStatus(rep.value),
       ])}
     />
   )
