@@ -17,6 +17,10 @@ Open http://localhost:5173
 npm run build
 ```
 
+## Deployment
+
+Vercel deploys the `main` branch from GitHub.
+
 ## Project structure
 
 - `src/components/` — Dashboard, layout, charts
