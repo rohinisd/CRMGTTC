@@ -7,15 +7,18 @@ export const googleSheetCsvUrl = `https://docs.google.com/spreadsheets/d/${SHEET
 
 type SheetRow = string[]
 type GoogleSheetCell = { v?: string | number | boolean | null; f?: string | null } | null
+type GoogleSheetColumn = { label?: string | null }
 type GoogleSheetTableRow = { c?: GoogleSheetCell[] }
 type GoogleSheetResponse = {
   status: string
   errors?: { detailed_message?: string; message?: string; reason?: string }[]
   table?: {
-    cols: unknown[]
+    cols: GoogleSheetColumn[]
     rows: GoogleSheetTableRow[]
   }
 }
+
+const mappedColumnIndexes = new Set(Array.from({ length: 26 }, (_, index) => index))
 
 function clean(value: string | undefined): string {
   return (value ?? '').replace(/\u200b/g, '').trim()
@@ -122,7 +125,21 @@ function fallbackStatus(row: SheetRow): string {
   return clean(row[12])
 }
 
-function mapSheetRow(row: SheetRow, index: number): Lead | null {
+function customFields(row: SheetRow, headers: SheetRow): Record<string, string> {
+  return headers.reduce<Record<string, string>>((fields, header, index) => {
+    if (mappedColumnIndexes.has(index)) return fields
+
+    const label = clean(header)
+    const value = clean(row[index])
+    if (label && value) {
+      fields[label] = value
+    }
+
+    return fields
+  }, {})
+}
+
+function mapSheetRow(row: SheetRow, index: number, headers: SheetRow = []): Lead | null {
   const studentName = clean(row[5])
   const contactNo = clean(row[6])
   const date = formatDate(row[2])
@@ -151,12 +168,14 @@ function mapSheetRow(row: SheetRow, index: number): Lead | null {
     cst3rdRefollowUp: followUp(row, 22, 23),
     fourthRefollowUp: followUp(row, 24, 25),
     earnings: 0,
+    customFields: customFields(row, headers),
+    sheetColumns: headers.map((header) => clean(header)),
   }
 }
 
 export function mapGoogleSheetCsv(csv: string): Lead[] {
-  const [, ...dataRows] = parseCsv(csv)
-  return dataRows.map(mapSheetRow).filter((lead): lead is Lead => lead !== null)
+  const [headers = [], ...dataRows] = parseCsv(csv)
+  return dataRows.map((row, index) => mapSheetRow(row, index, headers)).filter((lead): lead is Lead => lead !== null)
 }
 
 function googleSheetJsonpUrl(callbackName: string): string {
@@ -177,9 +196,10 @@ function mapGoogleSheetResponse(response: GoogleSheetResponse): Lead[] {
   }
 
   const columnCount = response.table.cols.length
+  const headers = response.table.cols.map((column) => clean(column.label ?? ''))
   return response.table.rows
     .map((row) => Array.from({ length: columnCount }, (_, index) => cellValue(row, index)))
-    .map(mapSheetRow)
+    .map((row, index) => mapSheetRow(row, index, headers))
     .filter((lead): lead is Lead => lead !== null)
 }
 

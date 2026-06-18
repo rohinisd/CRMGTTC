@@ -74,28 +74,34 @@ const pageMeta: Record<string, PageMeta> = {
   },
 }
 
-const fieldMappings = [
-  ['SL NO', 'slNo'],
-  ['Attended By', 'attendedBy'],
-  ['DATE', 'date'],
-  ['SOURSE', 'source'],
-  ['REFERED BY', 'referredBy'],
-  ['STUDENT NAME', 'studentName'],
-  ['CONTACT NO', 'contactNo'],
-  ['CATEGORY', 'category'],
-  ['QUALIFICATION', 'qualification'],
-  ['Area With Place', 'areaWithPlace'],
-  ['Course Name', 'courseName'],
-  ['REMARKS', 'remarks'],
-  ['STATUS', 'status'],
-  ['REFERENCE COUNT', 'referenceCount'],
-  ['Refollow up for cst', 'cstRefollowUp.date'],
-  ['Follow up done on 10.07.25', 'followUpDone.date'],
-  ['Refollowup date', 'refollowUp.date'],
-  ['CST Refollowup date', 'cstRefollowUpDate.date'],
-  ['CST 3rd Refollowup date', 'cst3rdRefollowUp.date'],
-  ['4th Refollowup date', 'fourthRefollowUp.date'],
-]
+const knownFieldByColumnIndex: Record<number, string> = {
+  0: 'slNo',
+  1: 'attendedBy',
+  2: 'date',
+  3: 'source',
+  4: 'referredBy',
+  5: 'studentName',
+  6: 'contactNo',
+  7: 'category',
+  8: 'qualification',
+  9: 'areaWithPlace',
+  10: 'courseName',
+  11: 'remarks',
+  12: 'status',
+  13: 'referenceCount',
+  14: 'cstRefollowUp.date',
+  15: 'cstRefollowUp.remarks',
+  16: 'followUpDone.date',
+  17: 'followUpDone.remarks',
+  18: 'refollowUp.date',
+  19: 'refollowUp.remarks',
+  20: 'cstRefollowUpDate.date',
+  21: 'cstRefollowUpDate.remarks',
+  22: 'cst3rdRefollowUp.date',
+  23: 'cst3rdRefollowUp.remarks',
+  24: 'fourthRefollowUp.date',
+  25: 'fourthRefollowUp.remarks',
+}
 
 function titleFor(pageId: string): PageMeta {
   return pageMeta[pageId] ?? {
@@ -243,9 +249,16 @@ function searchableLeadText(lead: Lead): string {
     lead.remarks,
     lead.status,
     lead.referenceCount,
+    ...Object.values(lead.customFields ?? {}),
   ]
     .join(' ')
     .toLowerCase()
+}
+
+function formatCustomFields(lead: Lead): string {
+  const entries = Object.entries(lead.customFields ?? {})
+  if (entries.length === 0) return ''
+  return entries.map(([field, value]) => `${field}: ${value}`).join(' | ')
 }
 
 function LeadsView({ leads }: { leads: Lead[] }) {
@@ -273,7 +286,7 @@ function LeadsView({ leads }: { leads: Lead[] }) {
       </div>
 
       <DataTable
-        columns={['SL No', 'Date', 'Student', 'Contact', 'Course', 'Status', 'Attended By', 'Remarks']}
+        columns={['SL No', 'Date', 'Student', 'Contact', 'Course', 'Status', 'Attended By', 'Remarks', 'Custom Fields']}
         rows={filteredLeads.map((lead) => [
           lead.slNo,
           formatDate(lead.date),
@@ -283,6 +296,7 @@ function LeadsView({ leads }: { leads: Lead[] }) {
           lead.status,
           lead.attendedBy,
           lead.remarks,
+          formatCustomFields(lead),
         ])}
       />
     </>
@@ -504,8 +518,24 @@ function InvoicesView({ leads }: { leads: Lead[] }) {
   )
 }
 
-function CustomFieldsView() {
-  return <DataTable columns={['Google Sheet Column', 'App Field']} rows={fieldMappings} />
+function CustomFieldsView({ leads }: { leads: Lead[] }) {
+  const sheetColumns = leads[0]?.sheetColumns ?? []
+  const customHeaders = new Set(leads.flatMap((lead) => Object.keys(lead.customFields ?? {})))
+  const columns = [...sheetColumns]
+
+  for (const header of customHeaders) {
+    if (!columns.includes(header)) columns.push(header)
+  }
+
+  const rows = columns
+    .filter((column) => column.trim())
+    .map((column, index) => {
+      const appField = knownFieldByColumnIndex[index] ?? `customFields.${column}`
+      const fieldType = knownFieldByColumnIndex[index] ? 'Mapped field' : 'Auto custom field'
+      return [column, appField, fieldType]
+    })
+
+  return <DataTable columns={['Google Sheet Column', 'App Field', 'Type']} rows={rows} />
 }
 
 function IntegrationsView({ leads, error }: { leads: Lead[]; error: string | null }) {
@@ -581,7 +611,7 @@ function renderPage(pageId: string, leads: Lead[], error: string | null) {
     case 'invoices':
       return <InvoicesView leads={leads} />
     case 'custom-fields':
-      return <CustomFieldsView />
+      return <CustomFieldsView leads={leads} />
     case 'integrations':
       return <IntegrationsView leads={leads} error={error} />
     case 'call-retention':

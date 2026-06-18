@@ -27,6 +27,8 @@ export interface Lead {
   cst3rdRefollowUp: FollowUpEntry
   fourthRefollowUp: FollowUpEntry
   earnings?: number
+  customFields?: Record<string, string>
+  sheetColumns?: string[]
 }
 
 export type ViewMode = 'Daily' | 'Monthly' | 'Yearly'
