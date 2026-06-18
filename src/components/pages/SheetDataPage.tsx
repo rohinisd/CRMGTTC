@@ -25,6 +25,8 @@ type FollowUpTask = {
   remarks: string
 }
 
+type CalendarStatus = 'All' | 'Today' | 'Scheduled / Planned' | 'Overdue' | 'Completed'
+
 const pageMeta: Record<string, PageMeta> = {
   leads: {
     title: 'Leads',
@@ -111,6 +113,21 @@ function formatDate(value: string): string {
 function isValidDateValue(value: string): boolean {
   if (!value) return false
   return !Number.isNaN(new Date(value).getTime())
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function calendarStatus(task: FollowUpTask): Exclude<CalendarStatus, 'All'> {
+  if (/follow up done/i.test(task.label)) return 'Completed'
+
+  const taskDate = startOfDay(new Date(task.date))
+  const today = startOfDay(new Date())
+
+  if (taskDate.getTime() === today.getTime()) return 'Today'
+  if (taskDate.getTime() > today.getTime()) return 'Scheduled / Planned'
+  return 'Overdue'
 }
 
 function groupBy(leads: Lead[], getValue: (lead: Lead) => string): GroupCount[] {
@@ -362,7 +379,13 @@ function CalendarView({ leads }: { leads: Lead[] }) {
     .sort((a, b) => (new Date(a.date).getTime() || 0) - (new Date(b.date).getTime() || 0))
   const availableDates = Array.from(new Set(tasks.map((task) => task.date)))
   const [selectedDate, setSelectedDate] = useState(availableDates[0] ?? '')
-  const filteredTasks = selectedDate ? tasks.filter((task) => task.date === selectedDate) : tasks
+  const [selectedStatus, setSelectedStatus] = useState<CalendarStatus>('All')
+  const statusOptions: CalendarStatus[] = ['All', 'Today', 'Scheduled / Planned', 'Overdue', 'Completed']
+  const filteredTasks = tasks.filter((task) => {
+    const matchesDate = selectedDate ? task.date === selectedDate : true
+    const matchesStatus = selectedStatus === 'All' ? true : calendarStatus(task) === selectedStatus
+    return matchesDate && matchesStatus
+  })
 
   return (
     <>
@@ -387,10 +410,29 @@ function CalendarView({ leads }: { leads: Lead[] }) {
         </div>
       </div>
 
+      <div className="status-filter">
+        {statusOptions.map((status) => {
+          const count = status === 'All' ? tasks.length : tasks.filter((task) => calendarStatus(task) === status).length
+
+          return (
+            <button
+              key={status}
+              type="button"
+              className={selectedStatus === status ? 'status-filter__button--active' : ''}
+              onClick={() => setSelectedStatus(status)}
+            >
+              {status}
+              <span>{count.toLocaleString('en-IN')}</span>
+            </button>
+          )
+        })}
+      </div>
+
       <DataTable
-        columns={['Date', 'Student', 'Contact', 'Event', 'Course', 'Remarks']}
+        columns={['Date', 'Status', 'Student', 'Contact', 'Event', 'Course', 'Remarks']}
         rows={filteredTasks.map((task) => [
           formatDate(task.date),
+          calendarStatus(task),
           task.lead.studentName,
           task.lead.contactNo,
           task.label,
