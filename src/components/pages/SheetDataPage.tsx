@@ -205,21 +205,65 @@ function CountTable({ title, data }: { title: string; data: GroupCount[] }) {
   )
 }
 
+function searchableLeadText(lead: Lead): string {
+  return [
+    lead.slNo,
+    lead.date,
+    lead.attendedBy,
+    lead.source,
+    lead.referredBy,
+    lead.studentName,
+    lead.contactNo,
+    lead.category,
+    lead.qualification,
+    lead.areaWithPlace,
+    lead.courseName,
+    lead.remarks,
+    lead.status,
+    lead.referenceCount,
+  ]
+    .join(' ')
+    .toLowerCase()
+}
+
 function LeadsView({ leads }: { leads: Lead[] }) {
+  const [search, setSearch] = useState('')
+  const query = search.trim().toLowerCase()
+  const sortedLeads = [...leads].sort((a, b) => a.slNo - b.slNo)
+  const filteredLeads = query ? sortedLeads.filter((lead) => searchableLeadText(lead).includes(query)) : sortedLeads
+
   return (
-    <DataTable
-      columns={['SL No', 'Date', 'Student', 'Contact', 'Course', 'Status', 'Attended By', 'Remarks']}
-      rows={latestLeads(leads, 100).map((lead) => [
-        lead.slNo,
-        formatDate(lead.date),
-        lead.studentName,
-        lead.contactNo,
-        lead.courseName,
-        lead.status,
-        lead.attendedBy,
-        lead.remarks,
-      ])}
-    />
+    <>
+      <div className="lead-toolbar">
+        <div className="lead-search">
+          <label htmlFor="lead-search">Search Leads</label>
+          <input
+            id="lead-search"
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by name, phone, course, status, remarks..."
+          />
+        </div>
+        <span>
+          Showing {filteredLeads.length.toLocaleString('en-IN')} of {leads.length.toLocaleString('en-IN')} leads
+        </span>
+      </div>
+
+      <DataTable
+        columns={['SL No', 'Date', 'Student', 'Contact', 'Course', 'Status', 'Attended By', 'Remarks']}
+        rows={filteredLeads.map((lead) => [
+          lead.slNo,
+          formatDate(lead.date),
+          lead.studentName,
+          lead.contactNo,
+          lead.courseName,
+          lead.status,
+          lead.attendedBy,
+          lead.remarks,
+        ])}
+      />
+    </>
   )
 }
 
