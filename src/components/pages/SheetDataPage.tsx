@@ -108,6 +108,11 @@ function formatDate(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('en-IN')
 }
 
+function isValidDateValue(value: string): boolean {
+  if (!value) return false
+  return !Number.isNaN(new Date(value).getTime())
+}
+
 function groupBy(leads: Lead[], getValue: (lead: Lead) => string): GroupCount[] {
   const counts = new Map<string, number>()
   for (const lead of leads) {
@@ -353,21 +358,47 @@ function AutoAssignView({ leads }: { leads: Lead[] }) {
 
 function CalendarView({ leads }: { leads: Lead[] }) {
   const tasks = getFollowUpTasks(leads)
-    .filter((task) => task.date)
+    .filter((task) => isValidDateValue(task.date))
     .sort((a, b) => (new Date(a.date).getTime() || 0) - (new Date(b.date).getTime() || 0))
+  const availableDates = Array.from(new Set(tasks.map((task) => task.date)))
+  const [selectedDate, setSelectedDate] = useState(availableDates[0] ?? '')
+  const filteredTasks = selectedDate ? tasks.filter((task) => task.date === selectedDate) : tasks
 
   return (
-    <DataTable
-      columns={['Date', 'Student', 'Contact', 'Event', 'Course', 'Remarks']}
-      rows={tasks.slice(0, 150).map((task) => [
-        formatDate(task.date),
-        task.lead.studentName,
-        task.lead.contactNo,
-        task.label,
-        task.lead.courseName,
-        task.remarks,
-      ])}
-    />
+    <>
+      <div className="lead-toolbar">
+        <div className="lead-search">
+          <label htmlFor="calendar-date">Select Date</label>
+          <input
+            id="calendar-date"
+            type="date"
+            value={selectedDate}
+            onChange={(event) => setSelectedDate(event.target.value)}
+          />
+        </div>
+        <div className="toolbar-actions">
+          <span>
+            Showing {filteredTasks.length.toLocaleString('en-IN')} of {tasks.length.toLocaleString('en-IN')} valid
+            calendar events
+          </span>
+          <button type="button" onClick={() => setSelectedDate('')}>
+            Show All Dates
+          </button>
+        </div>
+      </div>
+
+      <DataTable
+        columns={['Date', 'Student', 'Contact', 'Event', 'Course', 'Remarks']}
+        rows={filteredTasks.map((task) => [
+          formatDate(task.date),
+          task.lead.studentName,
+          task.lead.contactNo,
+          task.label,
+          task.lead.courseName,
+          task.remarks,
+        ])}
+      />
+    </>
   )
 }
 
