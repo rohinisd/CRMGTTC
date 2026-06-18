@@ -269,18 +269,51 @@ function LeadsView({ leads }: { leads: Lead[] }) {
 
 function CallLogsView({ leads }: { leads: Lead[] }) {
   const tasks = getFollowUpTasks(leads)
+    .filter((task) => task.date)
+    .sort((a, b) => {
+      const dateA = new Date(a.date).getTime() || 0
+      const dateB = new Date(b.date).getTime() || 0
+      return dateB - dateA || a.lead.slNo - b.lead.slNo
+    })
+  const availableDates = Array.from(new Set(tasks.map((task) => task.date)))
+  const [selectedDate, setSelectedDate] = useState(availableDates[0] ?? '')
+  const filteredTasks = selectedDate ? tasks.filter((task) => task.date === selectedDate) : tasks
+
   return (
-    <DataTable
-      columns={['Date', 'Student', 'Contact', 'Activity', 'Remarks', 'Attended By']}
-      rows={tasks.slice(0, 150).map((task) => [
-        formatDate(task.date),
-        task.lead.studentName,
-        task.lead.contactNo,
-        task.label,
-        task.remarks,
-        task.lead.attendedBy,
-      ])}
-    />
+    <>
+      <div className="lead-toolbar">
+        <div className="lead-search">
+          <label htmlFor="call-log-date">Select Date</label>
+          <input
+            id="call-log-date"
+            type="date"
+            value={selectedDate}
+            onChange={(event) => setSelectedDate(event.target.value)}
+          />
+        </div>
+        <div className="toolbar-actions">
+          <span>
+            Showing {filteredTasks.length.toLocaleString('en-IN')} of {tasks.length.toLocaleString('en-IN')} dated call
+            logs
+          </span>
+          <button type="button" onClick={() => setSelectedDate('')}>
+            Show All Dates
+          </button>
+        </div>
+      </div>
+
+      <DataTable
+        columns={['Date', 'Student', 'Contact', 'Activity', 'Remarks', 'Attended By']}
+        rows={filteredTasks.map((task) => [
+          formatDate(task.date),
+          task.lead.studentName,
+          task.lead.contactNo,
+          task.label,
+          task.remarks,
+          task.lead.attendedBy,
+        ])}
+      />
+    </>
   )
 }
 
