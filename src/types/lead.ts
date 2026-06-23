@@ -5,6 +5,11 @@ export interface FollowUpEntry {
   remarks: string
 }
 
+export interface FollowUpAttempt extends FollowUpEntry {
+  attempt: number
+  label: string
+}
+
 export interface Lead {
   slNo: number
   attendedBy: string
@@ -26,6 +31,8 @@ export interface Lead {
   cstRefollowUpDate: FollowUpEntry
   cst3rdRefollowUp: FollowUpEntry
   fourthRefollowUp: FollowUpEntry
+  seventhFollowUp?: FollowUpEntry
+  followUps: FollowUpAttempt[]
   earnings?: number
   customFields?: Record<string, string>
   sheetColumns?: string[]

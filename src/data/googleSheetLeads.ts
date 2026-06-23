@@ -1,4 +1,4 @@
-import type { FollowUpEntry, Lead, LeadStatus } from '../types/lead'
+import type { FollowUpAttempt, FollowUpEntry, Lead, LeadStatus } from '../types/lead'
 
 const SHEET_ID = '1VlHAfjQwTBBleJhRKLNmPbWqJxHGdm5YmoB4jE0JGHI'
 const SHEET_GID = '0'
@@ -18,7 +18,17 @@ type GoogleSheetResponse = {
   }
 }
 
-const mappedColumnIndexes = new Set(Array.from({ length: 26 }, (_, index) => index))
+const mappedColumnIndexes = new Set(Array.from({ length: 28 }, (_, index) => index))
+
+const followUpColumnPairs = [
+  { label: '1st Follow-up', dateIndex: 14, remarksIndex: 15 },
+  { label: '2nd Follow-up', dateIndex: 16, remarksIndex: 17 },
+  { label: '3rd Follow-up', dateIndex: 18, remarksIndex: 19 },
+  { label: '4th Follow-up', dateIndex: 20, remarksIndex: 21 },
+  { label: '5th Follow-up', dateIndex: 22, remarksIndex: 23 },
+  { label: '6th Follow-up', dateIndex: 24, remarksIndex: 25 },
+  { label: '7th Follow-up', dateIndex: 26, remarksIndex: 27 },
+]
 
 function clean(value: string | undefined): string {
   return (value ?? '').replace(/\u200b/g, '').trim()
@@ -116,6 +126,14 @@ function followUp(row: SheetRow, dateIndex: number, remarksIndex: number): Follo
   }
 }
 
+function followUps(row: SheetRow): FollowUpAttempt[] {
+  return followUpColumnPairs.map(({ label, dateIndex, remarksIndex }, index) => ({
+    attempt: index + 1,
+    label,
+    ...followUp(row, dateIndex, remarksIndex),
+  }))
+}
+
 function fallbackStatus(row: SheetRow): string {
   const remarks = clean(row[11])
   if (/admission\s+completed/i.test(remarks)) return 'Admission Completed'
@@ -143,6 +161,7 @@ function mapSheetRow(row: SheetRow, index: number, headers: SheetRow = []): Lead
   const studentName = clean(row[5])
   const contactNo = clean(row[6])
   const date = formatDate(row[2])
+  const attempts = followUps(row)
 
   if (!studentName && !contactNo && !date) return null
 
@@ -167,6 +186,8 @@ function mapSheetRow(row: SheetRow, index: number, headers: SheetRow = []): Lead
     cstRefollowUpDate: followUp(row, 20, 21),
     cst3rdRefollowUp: followUp(row, 22, 23),
     fourthRefollowUp: followUp(row, 24, 25),
+    seventhFollowUp: followUp(row, 26, 27),
+    followUps: attempts,
     earnings: 0,
     customFields: customFields(row, headers),
     sheetColumns: headers.map((header) => clean(header)),

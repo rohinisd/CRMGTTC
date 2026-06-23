@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchGoogleSheetLeads, googleSheetCsvUrl } from '../../data/googleSheetLeads'
-import type { FollowUpEntry, Lead } from '../../types/lead'
+import type { FollowUpAttempt, FollowUpEntry, Lead } from '../../types/lead'
 import { computeStats, getStatusBreakdown } from '../../utils/leadStats'
 import { StatCard } from '../dashboard/StatCard'
 
@@ -20,6 +20,7 @@ type GroupCount = {
 
 type FollowUpTask = {
   lead: Lead
+  attempt: number
   label: string
   date: string
   remarks: string
@@ -72,6 +73,10 @@ const pageMeta: Record<string, PageMeta> = {
     title: 'Call Retention',
     description: 'Contact quality, repeated numbers, and follow-up coverage.',
   },
+  'seven-follow-ups': {
+    title: '7 Follow-ups',
+    description: 'Track up to 7 follow-up attempts, reminders, remarks, and lead closure readiness.',
+  },
 }
 
 const knownFieldByColumnIndex: Record<number, string> = {
@@ -101,6 +106,8 @@ const knownFieldByColumnIndex: Record<number, string> = {
   23: 'cst3rdRefollowUp.remarks',
   24: 'fourthRefollowUp.date',
   25: 'fourthRefollowUp.remarks',
+  26: 'seventhFollowUp.date',
+  27: 'seventhFollowUp.remarks',
 }
 
 function titleFor(pageId: string): PageMeta {
@@ -152,27 +159,89 @@ function hasFollowUp(entry: FollowUpEntry): boolean {
   return Boolean(entry.date || entry.remarks)
 }
 
-function getFollowUpTasks(leads: Lead[]): FollowUpTask[] {
-  const columns: { label: string; getEntry: (lead: Lead) => FollowUpEntry }[] = [
-    { label: 'CST Refollow up', getEntry: (lead) => lead.cstRefollowUp },
-    { label: 'Follow up done', getEntry: (lead) => lead.followUpDone },
-    { label: 'Refollowup', getEntry: (lead) => lead.refollowUp },
-    { label: 'CST Refollowup date', getEntry: (lead) => lead.cstRefollowUpDate },
-    { label: 'CST 3rd Refollowup', getEntry: (lead) => lead.cst3rdRefollowUp },
-    { label: '4th Refollowup', getEntry: (lead) => lead.fourthRefollowUp },
-  ]
+function leadFollowUps(lead: Lead): FollowUpAttempt[] {
+  if (lead.followUps?.length) return lead.followUps
 
+  return [
+    { attempt: 1, label: '1st Follow-up', ...lead.cstRefollowUp },
+    { attempt: 2, label: '2nd Follow-up', ...lead.followUpDone },
+    { attempt: 3, label: '3rd Follow-up', ...lead.refollowUp },
+    { attempt: 4, label: '4th Follow-up', ...lead.cstRefollowUpDate },
+    { attempt: 5, label: '5th Follow-up', ...lead.cst3rdRefollowUp },
+    { attempt: 6, label: '6th Follow-up', ...lead.fourthRefollowUp },
+    { attempt: 7, label: '7th Follow-up', ...(lead.seventhFollowUp ?? { date: '', remarks: '' }) },
+  ]
+}
+
+function completedFollowUpCount(lead: Lead): number {
+  return leadFollowUps(lead).filter(hasFollowUp).length
+}
+
+function latestFollowUp(lead: Lead): FollowUpAttempt | undefined {
+  return [...leadFollowUps(lead)].reverse().find(hasFollowUp)
+}
+
+function leadTextForClosure(lead: Lead): string {
+  return [
+    lead.status,
+    lead.remarks,
+    ...leadFollowUps(lead).map((entry) => entry.remarks),
+  ].join(' ')
+}
+
+function leadClosureReason(lead: Lead): string {
+  const text = leadTextForClosure(lead)
+
+  if (/admission\s+completed|course\s+completed|converted|joined|join/i.test(text)) return 'Closed - Joined'
+  if (/not\s+interested|do\s*not\s*call|dont\s*call|don't\s*call|no\s+need|not\s+required|declined/i.test(text)) {
+    return 'Closed - Not interested'
+  }
+  if (completedFollowUpCount(lead) >= 7) return 'Can close - 7 attempts done'
+  return ''
+}
+
+function isLeadClosed(lead: Lead): boolean {
+  return Boolean(leadClosureReason(lead))
+}
+
+function nextReminder(lead: Lead): FollowUpAttempt | undefined {
+  if (isLeadClosed(lead)) return undefined
+
+  const today = startOfDay(new Date()).getTime()
+  const validReminders = leadFollowUps(lead)
+    .filter((entry) => isValidDateValue(entry.date))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  const upcomingReminder = validReminders.find((entry) => startOfDay(new Date(entry.date)).getTime() >= today)
+
+  return upcomingReminder ?? validReminders.at(-1)
+}
+
+function followUpStage(lead: Lead): string {
+  const closureReason = leadClosureReason(lead)
+  if (closureReason) return closureReason
+
+  const done = completedFollowUpCount(lead)
+  const nextAttempt = Math.min(done + 1, 7)
+  return `Follow-up ${nextAttempt} of 7`
+}
+
+function reminderLabel(lead: Lead): string {
+  const reminder = nextReminder(lead)
+  if (reminder) return `${formatDate(reminder.date)} (${reminder.label})`
+  if (isLeadClosed(lead)) return '-'
+  return 'Set reminder'
+}
+
+function getFollowUpTasks(leads: Lead[]): FollowUpTask[] {
   return leads.flatMap((lead) =>
-    columns
-      .map(({ label, getEntry }) => {
-        const entry = getEntry(lead)
-        return {
-          lead,
-          label,
-          date: entry.date,
-          remarks: entry.remarks,
-        }
-      })
+    leadFollowUps(lead)
+      .map((entry) => ({
+        lead,
+        attempt: entry.attempt,
+        label: entry.label,
+        date: entry.date,
+        remarks: entry.remarks,
+      }))
       .filter((task) => task.date || task.remarks),
   )
 }
@@ -249,6 +318,7 @@ function searchableLeadText(lead: Lead): string {
     lead.remarks,
     lead.status,
     lead.referenceCount,
+    ...leadFollowUps(lead).flatMap((entry) => [entry.date, entry.remarks]),
     ...Object.values(lead.customFields ?? {}),
   ]
     .join(' ')
@@ -286,7 +356,19 @@ function LeadsView({ leads }: { leads: Lead[] }) {
       </div>
 
       <DataTable
-        columns={['SL No', 'Date', 'Student', 'Contact', 'Course', 'Status', 'Attended By', 'Remarks', 'Custom Fields']}
+        columns={[
+          'SL No',
+          'Date',
+          'Student',
+          'Contact',
+          'Course',
+          'Status',
+          'Follow-up Stage',
+          'Next Reminder',
+          'Attended By',
+          'Remarks',
+          'Custom Fields',
+        ]}
         rows={filteredLeads.map((lead) => [
           lead.slNo,
           formatDate(lead.date),
@@ -294,6 +376,8 @@ function LeadsView({ leads }: { leads: Lead[] }) {
           lead.contactNo,
           lead.courseName,
           lead.status,
+          followUpStage(lead),
+          reminderLabel(lead),
           lead.attendedBy,
           lead.remarks,
           formatCustomFields(lead),
@@ -339,11 +423,12 @@ function CallLogsView({ leads }: { leads: Lead[] }) {
       </div>
 
       <DataTable
-        columns={['Date', 'Student', 'Contact', 'Activity', 'Remarks', 'Attended By']}
+        columns={['Date', 'Student', 'Contact', 'Attempt', 'Activity', 'Remarks', 'Attended By']}
         rows={filteredTasks.map((task) => [
           formatDate(task.date),
           task.lead.studentName,
           task.lead.contactNo,
+          `${task.attempt} of 7`,
           task.label,
           task.remarks,
           task.lead.attendedBy,
@@ -443,12 +528,13 @@ function CalendarView({ leads }: { leads: Lead[] }) {
       </div>
 
       <DataTable
-        columns={['Date', 'Status', 'Student', 'Contact', 'Event', 'Course', 'Remarks']}
+        columns={['Date', 'Status', 'Student', 'Contact', 'Attempt', 'Event', 'Course', 'Remarks']}
         rows={filteredTasks.map((task) => [
           formatDate(task.date),
           calendarStatus(task),
           task.lead.studentName,
           task.lead.contactNo,
+          `${task.attempt} of 7`,
           task.label,
           task.lead.courseName,
           task.remarks,
@@ -563,14 +649,7 @@ function CallRetentionView({ leads }: { leads: Lead[] }) {
   const contacts = groupBy(leads, (lead) => lead.contactNo).filter((item) => item.name !== 'Blank')
   const duplicateContacts = contacts.filter((item) => item.value > 1)
   const withFollowUps = leads.filter((lead) =>
-    [
-      lead.cstRefollowUp,
-      lead.followUpDone,
-      lead.refollowUp,
-      lead.cstRefollowUpDate,
-      lead.cst3rdRefollowUp,
-      lead.fourthRefollowUp,
-    ].some(hasFollowUp),
+    leadFollowUps(lead).some(hasFollowUp),
   )
 
   return (
@@ -586,6 +665,98 @@ function CallRetentionView({ leads }: { leads: Lead[] }) {
           item.name,
           item.value,
           'Multiple sheet rows use this number',
+        ])}
+      />
+    </>
+  )
+}
+
+type FollowUpWorkStatus = 'All' | 'Due Today' | 'Overdue' | 'Waiting Reminder' | 'Ready To Close'
+
+function followUpWorkStatus(lead: Lead): Exclude<FollowUpWorkStatus, 'All'> {
+  if (isLeadClosed(lead)) return 'Ready To Close'
+
+  const reminder = nextReminder(lead)
+  if (!reminder) return 'Waiting Reminder'
+
+  const reminderDate = startOfDay(new Date(reminder.date))
+  const today = startOfDay(new Date())
+
+  if (reminderDate.getTime() === today.getTime()) return 'Due Today'
+  if (reminderDate.getTime() < today.getTime()) return 'Overdue'
+  return 'Waiting Reminder'
+}
+
+function SevenFollowUpsView({ leads }: { leads: Lead[] }) {
+  const [selectedStatus, setSelectedStatus] = useState<FollowUpWorkStatus>('All')
+  const statusOptions: FollowUpWorkStatus[] = ['All', 'Due Today', 'Overdue', 'Waiting Reminder', 'Ready To Close']
+  const activeLeads = leads.filter((lead) => completedFollowUpCount(lead) > 0 || /pending|enquiry|follow up/i.test(lead.status))
+  const filteredLeads = activeLeads
+    .filter((lead) => (selectedStatus === 'All' ? true : followUpWorkStatus(lead) === selectedStatus))
+    .sort((a, b) => {
+      const reminderA = nextReminder(a)?.date
+      const reminderB = nextReminder(b)?.date
+      return (new Date(reminderA ?? '9999-12-31').getTime() || 0) - (new Date(reminderB ?? '9999-12-31').getTime() || 0)
+    })
+
+  const dueToday = activeLeads.filter((lead) => followUpWorkStatus(lead) === 'Due Today').length
+  const overdue = activeLeads.filter((lead) => followUpWorkStatus(lead) === 'Overdue').length
+  const readyToClose = activeLeads.filter((lead) => followUpWorkStatus(lead) === 'Ready To Close').length
+
+  return (
+    <>
+      <div className="sheet-note">
+        GTTC staff should record remarks for every contact attempt, set a reminder date when the lead asks to be
+        contacted later, and close the lead early only when the student joins or clearly says not to call. After the
+        7th attempt, the lead can be closed with the final call remark.
+      </div>
+
+      <div className="stat-grid stat-grid--4">
+        <StatCard label="Active Follow-up Leads" value={activeLeads.length} highlight />
+        <StatCard label="Due Today" value={dueToday} highlight />
+        <StatCard label="Overdue" value={overdue} highlight />
+        <StatCard label="Ready To Close" value={readyToClose} highlight />
+      </div>
+
+      <div className="status-filter">
+        {statusOptions.map((status) => {
+          const count =
+            status === 'All' ? activeLeads.length : activeLeads.filter((lead) => followUpWorkStatus(lead) === status).length
+
+          return (
+            <button
+              key={status}
+              type="button"
+              className={selectedStatus === status ? 'status-filter__button--active' : ''}
+              onClick={() => setSelectedStatus(status)}
+            >
+              {status}
+              <span>{count.toLocaleString('en-IN')}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      <DataTable
+        columns={[
+          'Student',
+          'Contact',
+          'Course',
+          'Employee',
+          'Progress',
+          'Next Reminder',
+          'Latest Remark',
+          'Closure Rule',
+        ]}
+        rows={filteredLeads.slice(0, 200).map((lead) => [
+          lead.studentName,
+          lead.contactNo,
+          lead.courseName,
+          lead.attendedBy,
+          `${completedFollowUpCount(lead)} / 7`,
+          reminderLabel(lead),
+          latestFollowUp(lead)?.remarks || lead.remarks,
+          leadClosureReason(lead) || 'Keep following up',
         ])}
       />
     </>
@@ -616,6 +787,8 @@ function renderPage(pageId: string, leads: Lead[], error: string | null) {
       return <IntegrationsView leads={leads} error={error} />
     case 'call-retention':
       return <CallRetentionView leads={leads} />
+    case 'seven-follow-ups':
+      return <SevenFollowUpsView leads={leads} />
     default:
       return <LeadsView leads={leads} />
   }

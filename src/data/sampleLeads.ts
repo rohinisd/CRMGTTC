@@ -2,6 +2,24 @@ import type { Lead } from '../types/lead'
 
 const emptyFollowUp = () => ({ date: '', remarks: '' })
 
+const followUpLabels = [
+  '1st Follow-up',
+  '2nd Follow-up',
+  '3rd Follow-up',
+  '4th Follow-up',
+  '5th Follow-up',
+  '6th Follow-up',
+  '7th Follow-up',
+]
+
+function buildFollowUps(entries: Record<number, { date: string; remarks: string }> = {}) {
+  return followUpLabels.map((label, index) => ({
+    attempt: index + 1,
+    label,
+    ...(entries[index + 1] ?? emptyFollowUp()),
+  }))
+}
+
 export const sampleLeads: Lead[] = [
   {
     slNo: 185,
@@ -24,6 +42,7 @@ export const sampleLeads: Lead[] = [
     cstRefollowUpDate: emptyFollowUp(),
     cst3rdRefollowUp: emptyFollowUp(),
     fourthRefollowUp: emptyFollowUp(),
+    followUps: buildFollowUps({ 2: { date: '2024-08-10', remarks: 'Mobile Call' } }),
     earnings: 15000,
   },
   {
@@ -47,6 +66,9 @@ export const sampleLeads: Lead[] = [
     cstRefollowUpDate: emptyFollowUp(),
     cst3rdRefollowUp: emptyFollowUp(),
     fourthRefollowUp: emptyFollowUp(),
+    followUps: buildFollowUps({
+      3: { date: '', remarks: 'Already Admission completed in Electrician Course' },
+    }),
   },
   {
     slNo: 170,
@@ -69,6 +91,7 @@ export const sampleLeads: Lead[] = [
     cstRefollowUpDate: emptyFollowUp(),
     cst3rdRefollowUp: emptyFollowUp(),
     fourthRefollowUp: emptyFollowUp(),
+    followUps: buildFollowUps({ 2: { date: '2024-08-09', remarks: 'Mobile Call' } }),
   },
   {
     slNo: 175,
@@ -91,6 +114,7 @@ export const sampleLeads: Lead[] = [
     cstRefollowUpDate: emptyFollowUp(),
     cst3rdRefollowUp: emptyFollowUp(),
     fourthRefollowUp: emptyFollowUp(),
+    followUps: buildFollowUps({ 2: { date: '2024-08-10', remarks: 'Mobile Call' } }),
   },
   {
     slNo: 105,
@@ -116,6 +140,12 @@ export const sampleLeads: Lead[] = [
     cstRefollowUpDate: emptyFollowUp(),
     cst3rdRefollowUp: emptyFollowUp(),
     fourthRefollowUp: emptyFollowUp(),
+    followUps: buildFollowUps({
+      3: {
+        date: '',
+        remarks: 'Information taken, asking Long term course & Diploma Mechatronics completed',
+      },
+    }),
   },
 ]
 
@@ -167,6 +197,7 @@ function generateLeads(): Lead[] {
         cstRefollowUpDate: emptyFollowUp(),
         cst3rdRefollowUp: emptyFollowUp(),
         fourthRefollowUp: emptyFollowUp(),
+        followUps: buildFollowUps(),
         earnings: converted ? 8000 + (slNo % 5) * 2000 : 0,
       })
     }

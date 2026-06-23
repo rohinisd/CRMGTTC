@@ -29,6 +29,7 @@ const navSections: { title: string; items: NavItem[] }[] = [
     items: [
       { id: 'leads', label: 'Leads', icon: <UsersIcon /> },
       { id: 'call-logs', label: 'Call Logs', icon: <PhoneIcon /> },
+      { id: 'seven-follow-ups', label: '7 Follow-ups', icon: <PhoneIcon /> },
       { id: 'tags', label: 'Tags', icon: <TagIcon /> },
       { id: 'auto-assign', label: 'Auto-assign', icon: <SyncIcon /> },
       { id: 'calendar', label: 'Calendar', icon: <CalendarIcon /> },
