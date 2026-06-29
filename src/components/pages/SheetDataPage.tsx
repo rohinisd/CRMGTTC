@@ -28,6 +28,17 @@ type FollowUpTask = {
 
 type CalendarStatus = 'All' | 'Today' | 'Scheduled / Planned' | 'Overdue' | 'Completed'
 
+type AnalyticsSection = {
+  id: string
+  title: string
+  getValue: (lead: Lead) => string
+}
+
+type AnalyticsSelection = {
+  sectionId: string
+  value: string
+}
+
 const pageMeta: Record<string, PageMeta> = {
   leads: {
     title: 'Leads',
@@ -567,8 +578,65 @@ function CalendarView({ leads }: { leads: Lead[] }) {
   )
 }
 
+function AnalyticsCountTable({
+  section,
+  data,
+  selectedValue,
+  onSelect,
+}: {
+  section: AnalyticsSection
+  data: GroupCount[]
+  selectedValue?: string
+  onSelect: (selection: AnalyticsSelection) => void
+}) {
+  return (
+    <section className="content-card">
+      <h3>{section.title}</h3>
+      <div className="data-table-wrap data-table-wrap--compact">
+        <table className="data-table analytics-count-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.slice(0, 12).map((item) => (
+              <tr key={item.name}>
+                <td>
+                  <button
+                    type="button"
+                    className={selectedValue === item.name ? 'analytics-count-table__button--active' : ''}
+                    onClick={() => onSelect({ sectionId: section.id, value: item.name })}
+                  >
+                    {item.name}
+                  </button>
+                </td>
+                <td>{item.value.toLocaleString('en-IN')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 function AnalyticsView({ leads }: { leads: Lead[] }) {
+  const [selection, setSelection] = useState<AnalyticsSelection | null>(null)
   const stats = computeStats(leads)
+  const sections: AnalyticsSection[] = [
+    { id: 'source', title: 'Top Sources', getValue: (lead) => lead.source },
+    { id: 'course', title: 'Top Courses', getValue: (lead) => lead.courseName },
+    { id: 'representative', title: 'Representative Performance', getValue: (lead) => lead.attendedBy },
+    { id: 'qualification', title: 'Qualification Mix', getValue: (lead) => lead.qualification },
+  ]
+  const selectedSection = selection ? sections.find((section) => section.id === selection.sectionId) : undefined
+  const selectedLeads =
+    selection && selectedSection
+      ? leads.filter((lead) => (selectedSection.getValue(lead) || 'Blank') === selection.value)
+      : []
+
   return (
     <>
       <div className="stat-grid stat-grid--4">
@@ -578,11 +646,47 @@ function AnalyticsView({ leads }: { leads: Lead[] }) {
         <StatCard label="Conversion Rate" value={`${stats.conversionRate.toFixed(1)}%`} highlight />
       </div>
       <div className="content-grid content-grid--2">
-        <CountTable title="Top Sources" data={groupBy(leads, (lead) => lead.source)} />
-        <CountTable title="Top Courses" data={groupBy(leads, (lead) => lead.courseName)} />
-        <CountTable title="Representative Performance" data={groupBy(leads, (lead) => lead.attendedBy)} />
-        <CountTable title="Qualification Mix" data={groupBy(leads, (lead) => lead.qualification)} />
+        {sections.map((section) => (
+          <AnalyticsCountTable
+            key={section.id}
+            section={section}
+            data={groupBy(leads, section.getValue)}
+            selectedValue={selection?.sectionId === section.id ? selection.value : undefined}
+            onSelect={setSelection}
+          />
+        ))}
       </div>
+
+      {selection && selectedSection && (
+        <section className="content-card">
+          <div className="analytics-detail-header">
+            <div>
+              <h3>
+                {selection.value} - {selectedSection.title}
+              </h3>
+              <p className="content-card__muted">
+                Showing {selectedLeads.length.toLocaleString('en-IN')} matching leads.
+              </p>
+            </div>
+            <button type="button" onClick={() => setSelection(null)}>
+              Clear Selection
+            </button>
+          </div>
+          <DataTable
+            columns={['Date', 'Student', 'Contact', 'Course', 'Source', 'Qualification', 'Status', 'Remarks']}
+            rows={latestLeads(selectedLeads, 200).map((lead) => [
+              formatDate(lead.date),
+              lead.studentName,
+              lead.contactNo,
+              lead.courseName,
+              lead.source,
+              lead.qualification,
+              lead.status,
+              lead.remarks,
+            ])}
+          />
+        </section>
+      )}
     </>
   )
 }
