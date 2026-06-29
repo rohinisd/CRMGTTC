@@ -12,6 +12,7 @@ import {
   TicketIcon,
   UsersIcon,
 } from '../icons/Icons'
+import gttcLogo from '../../assets/GTTCLogo.png'
 
 type SidebarProps = {
   collapsed: boolean
@@ -61,8 +62,13 @@ export function Sidebar({ collapsed, activeItem, onNavigate }: SidebarProps) {
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar--collapsed' : ''}`}>
       <div className="sidebar__brand">
-        <span className="sidebar__logo">GTTC</span>
-        {!collapsed && <span className="sidebar__logo-sub">Hubli</span>}
+        <img src={gttcLogo} alt="GTTC Hubli" className="sidebar__logo-image" />
+        {!collapsed && (
+          <div className="sidebar__brand-text">
+            <span className="sidebar__logo">GTTC</span>
+            <span className="sidebar__logo-sub">Hubli</span>
+          </div>
+        )}
       </div>
 
       <nav className="sidebar__nav">
