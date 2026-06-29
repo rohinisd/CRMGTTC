@@ -510,6 +510,36 @@ function AnalyticsCountTable({
   )
 }
 
+function csvValue(value: string | number): string {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`
+}
+
+function downloadLeadCsv(title: string, leads: Lead[]): void {
+  const columns = ['Date', 'Student', 'Contact', 'Course', 'Source', 'Qualification', 'Status', 'Remarks']
+  const rows = leads.map((lead) => [
+    formatDate(lead.date),
+    lead.studentName,
+    lead.contactNo,
+    lead.courseName,
+    lead.source,
+    lead.qualification,
+    lead.status,
+    lead.remarks,
+  ])
+  const csv = [columns, ...rows].map((row) => row.map(csvValue).join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const filename = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'lead-list'
+
+  link.href = url
+  link.download = `${filename}.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 function LeadDrilldown({
   title,
   leads,
@@ -519,6 +549,8 @@ function LeadDrilldown({
   leads: Lead[]
   onClear: () => void
 }) {
+  const displayedLeads = latestLeads(leads, 200)
+
   return (
     <section className="content-card">
       <div className="analytics-detail-header">
@@ -528,13 +560,18 @@ function LeadDrilldown({
             Showing {leads.length.toLocaleString('en-IN')} matching leads.
           </p>
         </div>
-        <button type="button" onClick={onClear}>
-          Clear Selection
-        </button>
+        <div className="analytics-detail-actions">
+          <button type="button" onClick={() => downloadLeadCsv(title, displayedLeads)}>
+            Download List
+          </button>
+          <button type="button" onClick={onClear}>
+            Clear Selection
+          </button>
+        </div>
       </div>
       <DataTable
         columns={['Date', 'Student', 'Contact', 'Course', 'Source', 'Qualification', 'Status', 'Remarks']}
-        rows={latestLeads(leads, 200).map((lead) => [
+        rows={displayedLeads.map((lead) => [
           formatDate(lead.date),
           lead.studentName,
           lead.contactNo,

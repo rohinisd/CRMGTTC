@@ -818,7 +818,14 @@ body {
   margin-bottom: 4px;
 }
 
-.analytics-detail-header button {
+.analytics-detail-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.analytics-detail-actions button {
   border: 1px solid var(--primary);
   background: var(--surface);
   color: var(--primary);
@@ -830,7 +837,7 @@ body {
   white-space: nowrap;
 }
 
-.analytics-detail-header button:hover {
+.analytics-detail-actions button:hover {
   background: var(--primary-light);
 }
 
@@ -930,5 +937,9 @@ body {
 
   .analytics-detail-header {
     flex-direction: column;
+  }
+
+  .analytics-detail-actions {
+    justify-content: flex-start;
   }
 }
