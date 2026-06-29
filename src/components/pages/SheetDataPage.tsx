@@ -333,9 +333,18 @@ function formatCustomFields(lead: Lead): string {
 
 function LeadsView({ leads }: { leads: Lead[] }) {
   const [search, setSearch] = useState('')
+  const [selectedDate, setSelectedDate] = useState('')
   const query = search.trim().toLowerCase()
-  const sortedLeads = [...leads].sort((a, b) => a.slNo - b.slNo)
-  const filteredLeads = query ? sortedLeads.filter((lead) => searchableLeadText(lead).includes(query)) : sortedLeads
+  const sortedLeads = [...leads].sort((a, b) => {
+    const dateA = new Date(a.date).getTime() || 0
+    const dateB = new Date(b.date).getTime() || 0
+    return dateB - dateA || a.slNo - b.slNo
+  })
+  const filteredLeads = sortedLeads.filter((lead) => {
+    const matchesSearch = query ? searchableLeadText(lead).includes(query) : true
+    const matchesDate = selectedDate ? lead.date === selectedDate : true
+    return matchesSearch && matchesDate
+  })
 
   return (
     <>
@@ -350,9 +359,23 @@ function LeadsView({ leads }: { leads: Lead[] }) {
             placeholder="Search by name, phone, course, status, remarks..."
           />
         </div>
-        <span>
-          Showing {filteredLeads.length.toLocaleString('en-IN')} of {leads.length.toLocaleString('en-IN')} leads
-        </span>
+        <div className="lead-search lead-search--date">
+          <label htmlFor="lead-date">Select Date</label>
+          <input
+            id="lead-date"
+            type="date"
+            value={selectedDate}
+            onChange={(event) => setSelectedDate(event.target.value)}
+          />
+        </div>
+        <div className="toolbar-actions">
+          <span>
+            Showing {filteredLeads.length.toLocaleString('en-IN')} of {leads.length.toLocaleString('en-IN')} leads
+          </span>
+          <button type="button" onClick={() => setSelectedDate('')}>
+            Show All Dates
+          </button>
+        </div>
       </div>
 
       <DataTable

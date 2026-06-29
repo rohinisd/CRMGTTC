@@ -640,6 +640,10 @@ body {
   max-width: 520px;
 }
 
+.lead-search--date {
+  flex: 0 0 180px;
+}
+
 .lead-search label {
   font-size: 12px;
   font-weight: 600;
@@ -832,6 +836,10 @@ body {
   .lead-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .lead-search--date {
+    flex: 1;
   }
 
   .lead-toolbar span {
