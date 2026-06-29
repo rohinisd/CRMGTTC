@@ -102,6 +102,36 @@ export function getStatusBreakdown(leads: Lead[]) {
   return Object.entries(counts).map(([name, value]) => ({ name, value }))
 }
 
+function normalizeSource(source: string): string {
+  const value = source.trim()
+  if (!value) return 'Blank'
+
+  if (/insta|instagram/i.test(value)) return 'Instagram'
+  if (/face\s*book|facebook|fb\b/i.test(value)) return 'Facebook'
+  if (/whats\s*app|whatsapp/i.test(value)) return 'WhatsApp'
+  if (/walk[\s-]*in/i.test(value)) return 'Walk-in'
+  if (/mobile|phone|call/i.test(value)) return 'Mobile Call'
+  if (/refer|friend/i.test(value)) return 'Referral'
+  if (/website|web|google/i.test(value)) return 'Website / Google'
+  if (/newspaper|vijay|paper/i.test(value)) return 'Newspaper'
+  if (/udyog|job\s*drive|mela/i.test(value)) return 'Job Drive / Mela'
+
+  return value
+}
+
+export function getSourceBreakdown(leads: Lead[]) {
+  const counts: Record<string, number> = {}
+
+  for (const lead of leads) {
+    const source = normalizeSource(lead.source)
+    counts[source] = (counts[source] ?? 0) + 1
+  }
+
+  return Object.entries(counts)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
+}
+
 export function getMonthlyLeadSummary(leads: Lead[], year: number) {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   return months.map((month, idx) => {

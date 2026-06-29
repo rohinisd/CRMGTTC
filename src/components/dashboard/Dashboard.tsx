@@ -7,6 +7,7 @@ import {
   filterLeads,
   getMonthlyLeadSummary,
   getRepresentatives,
+  getSourceBreakdown,
   getStatusBreakdown,
 } from '../../utils/leadStats'
 import { LeadBarChart } from '../charts/LeadBarChart'
@@ -26,6 +27,41 @@ function formatPercent(value: number) {
 function getLeadYear(lead: Lead): number | null {
   const date = new Date(lead.date)
   return Number.isNaN(date.getTime()) ? null : date.getFullYear()
+}
+
+function SourceBreakdownCard({ data }: { data: { name: string; value: number }[] }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0)
+  const topSources = data.slice(0, 10)
+
+  return (
+    <section className="content-card source-breakdown-card">
+      <h3>Lead Source Breakdown</h3>
+      <p className="content-card__muted">Counts from the sheet SOURCE column for the selected dashboard filters.</p>
+      <div className="source-breakdown-list">
+        {topSources.length > 0 ? (
+          topSources.map((source) => {
+            const percent = total > 0 ? (source.value / total) * 100 : 0
+
+            return (
+              <div key={source.name} className="source-breakdown-row">
+                <div className="source-breakdown-row__meta">
+                  <strong>{source.name}</strong>
+                  <span>
+                    {source.value.toLocaleString('en-IN')} leads · {percent.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="source-breakdown-row__bar" aria-hidden="true">
+                  <span style={{ width: `${percent}%` }} />
+                </div>
+              </div>
+            )
+          })
+        ) : (
+          <p className="content-card__muted">No source data found for this filter.</p>
+        )}
+      </div>
+    </section>
+  )
 }
 
 export function Dashboard() {
@@ -92,6 +128,8 @@ export function Dashboard() {
 
   const stats = useMemo(() => computeStats(filteredLeads), [filteredLeads])
   const statusBreakdown = useMemo(() => getStatusBreakdown(filteredLeads), [filteredLeads])
+  const sourceBreakdown = useMemo(() => getSourceBreakdown(filteredLeads), [filteredLeads])
+  const topSources = sourceBreakdown.slice(0, 4)
   const monthlySummary = useMemo(
     () => getMonthlyLeadSummary(filteredLeads, selectedYear),
     [filteredLeads, selectedYear],
@@ -208,9 +246,21 @@ export function Dashboard() {
         <StatCard label="Conversion Rate" value={formatPercent(stats.conversionRate)} highlight />
       </div>
 
+      <div className="stat-grid stat-grid--4">
+        {topSources.length > 0 ? (
+          topSources.map((source) => <StatCard key={source.name} label={`${source.name} Leads`} value={source.value} />)
+        ) : (
+          <StatCard label="Source Data" value="0" />
+        )}
+      </div>
+
       <div className="dashboard__charts">
         <LeadBarChart data={monthlySummary} />
         <StatusPieChart data={statusBreakdown} />
+      </div>
+
+      <div className="dashboard__insights">
+        <SourceBreakdownCard data={sourceBreakdown} />
       </div>
     </div>
   )

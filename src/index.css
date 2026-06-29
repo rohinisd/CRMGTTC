@@ -483,6 +483,57 @@ body {
   justify-content: center;
 }
 
+.dashboard__insights {
+  margin-top: 16px;
+}
+
+.source-breakdown-card {
+  margin-bottom: 16px;
+}
+
+.source-breakdown-list {
+  display: grid;
+  gap: 12px;
+}
+
+.source-breakdown-row {
+  display: grid;
+  gap: 8px;
+}
+
+.source-breakdown-row__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.source-breakdown-row__meta strong {
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.source-breakdown-row__meta span {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.source-breakdown-row__bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border-light);
+}
+
+.source-breakdown-row__bar span {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), #22c55e);
+}
+
 .sheet-page {
   display: flex;
   flex-direction: column;
@@ -790,5 +841,15 @@ body {
   .toolbar-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .source-breakdown-row__meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .source-breakdown-row__meta span {
+    white-space: normal;
   }
 }
