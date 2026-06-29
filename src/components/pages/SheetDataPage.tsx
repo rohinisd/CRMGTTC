@@ -39,6 +39,9 @@ type AnalyticsSelection = {
   value: string
 }
 
+type DrilldownSection = AnalyticsSection
+type DrilldownSelection = AnalyticsSelection
+
 const pageMeta: Record<string, PageMeta> = {
   leads: {
     title: 'Leads',
@@ -304,15 +307,6 @@ function DataTable({
   )
 }
 
-function CountTable({ title, data }: { title: string; data: GroupCount[] }) {
-  return (
-    <section className="content-card">
-      <h3>{title}</h3>
-      <DataTable columns={['Name', 'Count']} rows={data.slice(0, 12).map((item) => [item.name, item.value])} />
-    </section>
-  )
-}
-
 function searchableLeadText(lead: Lead): string {
   return [
     lead.slNo,
@@ -472,14 +466,125 @@ function CallLogsView({ leads }: { leads: Lead[] }) {
   )
 }
 
-function TagsView({ leads }: { leads: Lead[] }) {
+function AnalyticsCountTable({
+  section,
+  data,
+  selectedValue,
+  onSelect,
+}: {
+  section: AnalyticsSection
+  data: GroupCount[]
+  selectedValue?: string
+  onSelect: (selection: AnalyticsSelection) => void
+}) {
   return (
-    <div className="content-grid content-grid--2">
-      <CountTable title="Status Tags" data={getStatusBreakdown(leads)} />
-      <CountTable title="Course Tags" data={groupBy(leads, (lead) => lead.courseName)} />
-      <CountTable title="Source Tags" data={groupBy(leads, (lead) => lead.source)} />
-      <CountTable title="Category Tags" data={groupBy(leads, (lead) => lead.category)} />
-    </div>
+    <section className="content-card">
+      <h3>{section.title}</h3>
+      <div className="data-table-wrap data-table-wrap--compact">
+        <table className="data-table analytics-count-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.slice(0, 12).map((item) => (
+              <tr key={item.name}>
+                <td>
+                  <button
+                    type="button"
+                    className={selectedValue === item.name ? 'analytics-count-table__button--active' : ''}
+                    onClick={() => onSelect({ sectionId: section.id, value: item.name })}
+                  >
+                    {item.name}
+                  </button>
+                </td>
+                <td>{item.value.toLocaleString('en-IN')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function LeadDrilldown({
+  title,
+  leads,
+  onClear,
+}: {
+  title: string
+  leads: Lead[]
+  onClear: () => void
+}) {
+  return (
+    <section className="content-card">
+      <div className="analytics-detail-header">
+        <div>
+          <h3>{title}</h3>
+          <p className="content-card__muted">
+            Showing {leads.length.toLocaleString('en-IN')} matching leads.
+          </p>
+        </div>
+        <button type="button" onClick={onClear}>
+          Clear Selection
+        </button>
+      </div>
+      <DataTable
+        columns={['Date', 'Student', 'Contact', 'Course', 'Source', 'Qualification', 'Status', 'Remarks']}
+        rows={latestLeads(leads, 200).map((lead) => [
+          formatDate(lead.date),
+          lead.studentName,
+          lead.contactNo,
+          lead.courseName,
+          lead.source,
+          lead.qualification,
+          lead.status,
+          lead.remarks,
+        ])}
+      />
+    </section>
+  )
+}
+
+function TagsView({ leads }: { leads: Lead[] }) {
+  const [selection, setSelection] = useState<DrilldownSelection | null>(null)
+  const sections: DrilldownSection[] = [
+    { id: 'status', title: 'Status Tags', getValue: (lead) => lead.status },
+    { id: 'course', title: 'Course Tags', getValue: (lead) => lead.courseName },
+    { id: 'source', title: 'Source Tags', getValue: (lead) => lead.source },
+    { id: 'category', title: 'Category Tags', getValue: (lead) => lead.category },
+  ]
+  const selectedSection = selection ? sections.find((section) => section.id === selection.sectionId) : undefined
+  const selectedLeads =
+    selection && selectedSection
+      ? leads.filter((lead) => (selectedSection.getValue(lead) || 'Blank') === selection.value)
+      : []
+
+  return (
+    <>
+      <div className="content-grid content-grid--2">
+        {sections.map((section) => (
+          <AnalyticsCountTable
+            key={section.id}
+            section={section}
+            data={section.id === 'status' ? getStatusBreakdown(leads) : groupBy(leads, section.getValue)}
+            selectedValue={selection?.sectionId === section.id ? selection.value : undefined}
+            onSelect={setSelection}
+          />
+        ))}
+      </div>
+
+      {selection && selectedSection && (
+        <LeadDrilldown
+          title={`${selection.value} - ${selectedSection.title}`}
+          leads={selectedLeads}
+          onClear={() => setSelection(null)}
+        />
+      )}
+    </>
   )
 }
 
@@ -578,50 +683,6 @@ function CalendarView({ leads }: { leads: Lead[] }) {
   )
 }
 
-function AnalyticsCountTable({
-  section,
-  data,
-  selectedValue,
-  onSelect,
-}: {
-  section: AnalyticsSection
-  data: GroupCount[]
-  selectedValue?: string
-  onSelect: (selection: AnalyticsSelection) => void
-}) {
-  return (
-    <section className="content-card">
-      <h3>{section.title}</h3>
-      <div className="data-table-wrap data-table-wrap--compact">
-        <table className="data-table analytics-count-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Count</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.slice(0, 12).map((item) => (
-              <tr key={item.name}>
-                <td>
-                  <button
-                    type="button"
-                    className={selectedValue === item.name ? 'analytics-count-table__button--active' : ''}
-                    onClick={() => onSelect({ sectionId: section.id, value: item.name })}
-                  >
-                    {item.name}
-                  </button>
-                </td>
-                <td>{item.value.toLocaleString('en-IN')}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
-}
-
 function AnalyticsView({ leads }: { leads: Lead[] }) {
   const [selection, setSelection] = useState<AnalyticsSelection | null>(null)
   const stats = computeStats(leads)
@@ -658,34 +719,11 @@ function AnalyticsView({ leads }: { leads: Lead[] }) {
       </div>
 
       {selection && selectedSection && (
-        <section className="content-card">
-          <div className="analytics-detail-header">
-            <div>
-              <h3>
-                {selection.value} - {selectedSection.title}
-              </h3>
-              <p className="content-card__muted">
-                Showing {selectedLeads.length.toLocaleString('en-IN')} matching leads.
-              </p>
-            </div>
-            <button type="button" onClick={() => setSelection(null)}>
-              Clear Selection
-            </button>
-          </div>
-          <DataTable
-            columns={['Date', 'Student', 'Contact', 'Course', 'Source', 'Qualification', 'Status', 'Remarks']}
-            rows={latestLeads(selectedLeads, 200).map((lead) => [
-              formatDate(lead.date),
-              lead.studentName,
-              lead.contactNo,
-              lead.courseName,
-              lead.source,
-              lead.qualification,
-              lead.status,
-              lead.remarks,
-            ])}
-          />
-        </section>
+        <LeadDrilldown
+          title={`${selection.value} - ${selectedSection.title}`}
+          leads={selectedLeads}
+          onClear={() => setSelection(null)}
+        />
       )}
     </>
   )
